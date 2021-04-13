@@ -1,0 +1,11 @@
+@mixin flexbox($wrap: nowrap, $justify: flex-start, $align: stretch) {
+    display: flex;
+    flex-wrap: $wrap;
+    justify-content: $justify;
+    align-items: $align;
+}
+
+@mixin pageSize($width: 960px) {
+    width: $width;
+    margin: 0 auto;
+}

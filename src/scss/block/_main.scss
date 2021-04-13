@@ -1,0 +1,11 @@
+/* main */
+.main {
+  @include pageSize();
+  &__title {
+    color: $text-color;
+    font-size: 2em;
+  }
+  &__lede {
+    font-size: 1em;
+  }
+}
