@@ -2,7 +2,7 @@
 .header {
     @include pageSize();
     padding: 80px 10px;
-    background-image: url(../img/header_bg.jpeg);
+    background-image: url(../img/header_bg.jpg);
     background-size: cover;
     text-align: center;
     &__title {

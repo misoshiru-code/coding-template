@@ -1,6 +1,5 @@
 const gulp = require("gulp");//本体
 const del = require('del');//削除
-
 const plumber = require("gulp-plumber");//エラーで強制終了の無効
 const notify = require("gulp-notify"); // エラー発生時のアラート出力
 //ejs
@@ -13,35 +12,42 @@ const browserSync = require('browser-sync');//ブラウザリロード
 const autoprefixer = require('gulp-autoprefixer');//ベンダープレフィックス自動付与
 const postcss = require("gulp-postcss");//css-mqpackerを使うために必要
 const mqpacker = require('css-mqpacker');//メディアクエリをまとめる
+const sassGlob = require('gulp-sass-glob');
 //画像圧縮
 const imagemin = require('gulp-imagemin');
 const mozjpeg = require('imagemin-mozjpeg');
 const pngquant = require('imagemin-pngquant');
 
+
 // ファイルパス：コンパイル前
 const srcEjsFiles = './src/ejs/**/*.ejs';
 const srcEjsPartial = '!./src/ejs/**/_*.ejs';
 const srcScssFiles = './src/scss/**/*.scss';
+const srcJsFiles = './src/js/**/*.js'
 const srcImgFiles = './src/img/**/*'
 const srcImgFileType = '{jpg,jpeg,png,gif,svg}';
 
 // ファイルパス：コンパイル後
 const destDir = './dest/';
-const destFiles = './dest/**/*';
 const destHtmlFiles = './dest/*.html';
 const destIndexHtml = 'index.html';
 const destCssDir = './dest/css';
 const destCssFiles = './dest/css/*.css';
 const destJsDir = './dest/js';
-const destJSFiles = './dest/js/*.js';
-const destImtDir = './dest/img';
+const destJsFiles = './dest/js/*.js';
+const destImgDir = './dest/img';
 const destImgFiles = './dest/img/*';
+const destFiles = './dest/**/*';
 
 
 // EJSコンパイル
 const compileEjs = (done) => {
     gulp.src([srcEjsFiles, srcEjsPartial])
-        .pipe(plumber({ errorHandler: notify.onError('Error:<%= error.message %>') }))
+        .pipe(
+            //エラーが出ても処理を止めない
+            plumber({
+                errorHandler: notify.onError('Error:<%= error.message %>')
+            }))
         .pipe(ejs())
         .pipe(ejs({}, {}, { ext: '.html' }))
         .pipe(rename({ extname: '.html' }))
@@ -53,11 +59,15 @@ const compileEjs = (done) => {
 // sassコンパイル
 const compileSass = (done) => {
     gulp.src(srcScssFiles)
-        .pipe(plumber({ errorHandler: notify.onError('Error:<%= error.message %>') }))
+        .pipe(
+            //エラーが出ても処理を止めない
+            plumber({
+                errorHandler: notify.onError('Error:<%= error.message %>')
+            }))
+        .pipe(sassGlob())
         .pipe(sass({ outputStyle: 'expanded' }))//圧縮せずにcss出力
         .pipe(autoprefixer(TARGET_BROWSERS))// ベンダープレフィックス自動付与
         .pipe(postcss([mqpacker()])) // メディアクエリをまとめる
-        //.on('error', sass.logError)
         .pipe(gulp.dest(destCssDir));
     done();
 };
@@ -67,6 +77,13 @@ const TARGET_BROWSERS = [
     'last 2 versions',//各ブラウザの2世代前までのバージョンを担保
     'ie >= 11'//IE11を担保
 ];
+
+// jsコンパイル
+const compileJs = (done) => {
+    gulp.src(srcJsFiles)
+        .pipe(gulp.dest(destJsDir));
+    done();
+};
 
 // リロードするhtml
 const reloadFile = (done) => {
@@ -96,13 +113,13 @@ const minifyImage = (done) => {
                 imagemin.gifsicle()
             ]
         ))
-        .pipe(gulp.dest(destImtDir));
+        .pipe(gulp.dest(destImgDir));
     done();
 };
 
 // destフォルダのファイル削除
 const clean = (done) => {
-    del([destFiles, '!' + destCssDir, '!' + destJsDir, '!' + destImtDir]);
+    del([destFiles, '!' + destCssDir, '!' + destJsDir, '!' + destImgDir]);
     done();
 };
 
@@ -121,6 +138,7 @@ const imgClean = (done) => {
 // タスク化
 exports.compileEjs = compileEjs;
 exports.compileSass = compileSass;
+exports.compileJs = compileJs;
 exports.reloadFile = reloadFile;
 exports.reloadBrowser = reloadBrowser;
 exports.minifyImage = minifyImage;
@@ -134,7 +152,8 @@ const watchFiles = (done) => {
     gulp.watch(destHtmlFiles, reloadBrowser);
     gulp.watch(srcScssFiles, compileSass);
     gulp.watch(destCssFiles, reloadBrowser);
-    gulp.watch(destJSFiles, reloadBrowser);
+    gulp.watch(srcJsFiles, compileJs);
+    gulp.watch(destJsFiles, reloadBrowser);
     gulp.watch(srcImgFiles, gulp.series(imgClean, minifyImage));
     gulp.watch(destImgFiles, reloadBrowser);
     done();
@@ -142,5 +161,5 @@ const watchFiles = (done) => {
 
 // タスク実行
 exports.default = gulp.series(
-    clean, watchFiles, reloadFile, compileEjs, compileSass, minifyImage
+    clean, watchFiles, reloadFile, compileEjs, compileSass, compileJs, minifyImage
 );
