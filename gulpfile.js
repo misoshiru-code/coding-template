@@ -26,19 +26,28 @@ const srcScssFiles = './src/scss/**/*.scss';
 const srcJsFiles = './src/js/**/*.js'
 const srcImgFiles = './src/img/**/*'
 const srcImgFileType = '{jpg,jpeg,png,gif,svg}';
+const srcMovFiles = './src/mov/**/*'
 
 // ファイルパス：コンパイル後
 const destDir = './dest/';
-const destHtmlFiles = './dest/*.html';
 const destIndexHtml = 'index.html';
 const destCssDir = './dest/css';
-const destCssFiles = './dest/css/*.css';
 const destJsDir = './dest/js';
-const destJsFiles = './dest/js/*.js';
 const destImgDir = './dest/img';
-const destImgFiles = './dest/img/*';
+const destMovDir = './dest/mov';
 const destFiles = './dest/**/*';
 
+// destフォルダのファイル削除
+const clean = (done) => {
+    del([destFiles, '!' + destCssDir, '!' + destJsDir]);
+    done();
+};
+
+//ベンダープレフィックスを付与する条件
+const TARGET_BROWSERS = [
+    'last 2 versions',//各ブラウザの2世代前までのバージョンを担保
+    'ie >= 11'//IE11を担保
+];
 
 // EJSコンパイル
 const compileEjs = (done) => {
@@ -72,16 +81,32 @@ const compileSass = (done) => {
     done();
 };
 
-//ベンダープレフィックスを付与する条件
-const TARGET_BROWSERS = [
-    'last 2 versions',//各ブラウザの2世代前までのバージョンを担保
-    'ie >= 11'//IE11を担保
-];
-
 // jsコンパイル
 const compileJs = (done) => {
     gulp.src(srcJsFiles)
         .pipe(gulp.dest(destJsDir));
+    done();
+};
+
+// 画像圧縮
+const minifyImage = (done) => {
+    gulp.src(srcImgFiles + srcImgFileType)
+        .pipe(imagemin(
+            [
+                pngquant({ quality: [.65, .80], speed: 1 }),
+                mozjpeg({ quality: 80 }),
+                imagemin.svgo(),
+                imagemin.gifsicle()
+            ]
+        ))
+        .pipe(gulp.dest(destImgDir));
+    done();
+};
+
+// 動画ファイルコピー
+const copyMov = (done) => {
+    gulp.src(srcMovFiles)
+        .pipe(gulp.dest(destMovDir));
     done();
 };
 
@@ -102,39 +127,6 @@ const reloadBrowser = (done) => {
     done();
 };
 
-// 画像圧縮
-const minifyImage = (done) => {
-    gulp.src(srcImgFiles + srcImgFileType)
-        .pipe(imagemin(
-            [
-                pngquant({ quality: '65-80', speed: 1 }),
-                mozjpeg({ quality: 80 }),
-                imagemin.svgo(),
-                imagemin.gifsicle()
-            ]
-        ))
-        .pipe(gulp.dest(destImgDir));
-    done();
-};
-
-// destフォルダのファイル削除
-const clean = (done) => {
-    del([destFiles, '!' + destCssDir, '!' + destJsDir, '!' + destImgDir]);
-    done();
-};
-
-// HTMLファイル削除
-const htmlClean = (done) => {
-    del([destHtmlFiles]);
-    done();
-};
-
-// 画像ファイル削除
-const imgClean = (done) => {
-    del([destImgFiles]);
-    done();
-};
-
 // タスク化
 exports.compileEjs = compileEjs;
 exports.compileSass = compileSass;
@@ -142,24 +134,22 @@ exports.compileJs = compileJs;
 exports.reloadFile = reloadFile;
 exports.reloadBrowser = reloadBrowser;
 exports.minifyImage = minifyImage;
+exports.copyMov = copyMov;
 exports.clean = clean;
-exports.htmlClean = htmlClean;
-exports.imgClean = imgClean;
 
 // 監視ファイル
 const watchFiles = (done) => {
-    gulp.watch(srcEjsFiles, gulp.series(htmlClean, compileEjs));
-    gulp.watch(destHtmlFiles, reloadBrowser);
-    gulp.watch(srcScssFiles, compileSass);
-    gulp.watch(destCssFiles, reloadBrowser);
-    gulp.watch(srcJsFiles, compileJs);
-    gulp.watch(destJsFiles, reloadBrowser);
-    gulp.watch(srcImgFiles, gulp.series(imgClean, minifyImage));
-    gulp.watch(destImgFiles, reloadBrowser);
+    gulp.watch(srcEjsFiles, gulp.series(compileEjs, reloadBrowser));
+    gulp.watch(srcScssFiles, gulp.series(compileSass, reloadBrowser));
+    gulp.watch(srcJsFiles, gulp.series(compileJs, reloadBrowser));
+    gulp.watch(srcImgFiles, gulp.series(minifyImage, reloadBrowser));
+    gulp.watch(srcMovFiles, gulp.series(copyMov));
     done();
 };
 
 // タスク実行
 exports.default = gulp.series(
-    clean, watchFiles, reloadFile, compileEjs, compileSass, compileJs, minifyImage
+    clean,
+    gulp.parallel(compileEjs, compileSass, compileJs, minifyImage, copyMov),
+    gulp.parallel(watchFiles, reloadFile)  
 );
