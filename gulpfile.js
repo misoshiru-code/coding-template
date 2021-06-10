@@ -39,7 +39,7 @@ const destFiles = './dest/**/*';
 
 // destフォルダのファイル削除
 const clean = (done) => {
-    del([destFiles, '!' + destCssDir, '!' + destJsDir]);
+    del([destFiles, '!' + destCssDir, '!' + destJsDir, '!' + destImgDir]);
     done();
 };
 
@@ -77,7 +77,8 @@ const compileSass = (done) => {
         .pipe(sass({ outputStyle: 'expanded' }))//圧縮せずにcss出力
         .pipe(autoprefixer(TARGET_BROWSERS))// ベンダープレフィックス自動付与
         .pipe(postcss([mqpacker()])) // メディアクエリをまとめる
-        .pipe(gulp.dest(destCssDir));
+        .pipe(gulp.dest(destCssDir))
+        .pipe(browserSync.stream()); //コンパイル後、ブラウザ再読み込み
     done();
 };
 
@@ -95,9 +96,15 @@ const minifyImage = (done) => {
             [
                 pngquant({ quality: [.65, .80], speed: 1 }),
                 mozjpeg({ quality: 80 }),
-                imagemin.svgo(),
+                imagemin.svgo({
+                    plugins: [{
+                        removeViewbox: false
+                    }]
+                }),
                 imagemin.gifsicle()
-            ]
+            ], {
+            verbose: true
+        }
         ))
         .pipe(gulp.dest(destImgDir));
     done();
@@ -140,7 +147,7 @@ exports.clean = clean;
 // 監視ファイル
 const watchFiles = (done) => {
     gulp.watch(srcEjsFiles, gulp.series(compileEjs, reloadBrowser));
-    gulp.watch(srcScssFiles, gulp.series(compileSass, reloadBrowser));
+    gulp.watch(srcScssFiles, gulp.series(compileSass));//compileSass内でリロード
     gulp.watch(srcJsFiles, gulp.series(compileJs, reloadBrowser));
     gulp.watch(srcImgFiles, gulp.series(minifyImage, reloadBrowser));
     gulp.watch(srcMovFiles, gulp.series(copyMov));
